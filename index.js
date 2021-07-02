@@ -11,13 +11,14 @@
  * =====================================
  * =====================================
  */
-const CERT_URL=process.env.CERT_URL || 'https://certificates.rocketacademy.co';
-//const CERT_URL=process.env.CERT_URL || ='https://rocketacademy.github.io/certificates'
+const CERT_URL = process.env.CERT_URL || 'https://certificates.rocketacademy.co';
+// const CERT_URL=process.env.CERT_URL || ='https://rocketacademy.github.io/certificates'
 
 const moment = require('moment');
-const express = require('express')
-const port = process.env.PORT || 3000
-const app = express()
+const express = require('express');
+
+const port = process.env.PORT || 3000;
+const app = express();
 require('dotenv').config();
 
 /* =====================================
@@ -31,11 +32,13 @@ require('dotenv').config();
  */
 
 const { createEventAdapter } = require('@slack/events-api');
-const slackEvents = createEventAdapter(process.env.SLACK_SIGNING_SECRET)
+
+const slackEvents = createEventAdapter(process.env.SLACK_SIGNING_SECRET);
 
 const { WebClient } = require('@slack/web-api');
-const token = process.env.SLACKBOT_TOKEN
-const webClient = new WebClient(token)
+
+const token = process.env.SLACKBOT_TOKEN;
+const webClient = new WebClient(token);
 
 /* =====================================
  * =====================================
@@ -47,8 +50,7 @@ const webClient = new WebClient(token)
  * =====================================
  */
 
-
-app.use('/slack/events', slackEvents.expressMiddleware())
+app.use('/slack/events', slackEvents.expressMiddleware());
 
 // SLACK_SIGNING_SECRET=<signing_secret> SLACK_BOT_TOKEN=<bot_user_oAuth_access_token> node app.js
 
@@ -62,31 +64,23 @@ slackEvents.on('app_mention', async (event) => {
 
     // '<@U024AFLF4LW> <@UURCC8FEC>' - example user message text that mentions users
     const userIdStrs = event.text.match(/\<(.+?)\>/g);
-    const userIds = userIdStrs.map(userIdStr =>
-      userIdStr.substr(2,userIdStr.length-3)
-    );
+    const userIds = userIdStrs.map((userIdStr) => userIdStr.substr(2, userIdStr.length - 3));
 
-    const users = [];
-
-    for( let i=0; i<userIds.length; i+=1){
-
-      let userId = userIds[i];
-      const response = await webClient.users.info({ user: userId });
-      users.push( response.user );
-
-      console.log('got one user', response);
-    }
+    const users = await requestAllUsers(userIds);
 
     const messageJsonBlock = createJsonBlock(users);
-    const mentionResponseBlock = { ...messageJsonBlock, ...{channel: event.channel}, text: 'Congrats!'}
-    const res = await webClient.chat.postMessage(mentionResponseBlock)
-    console.log('Message sent: ', res.ts)
-
-  } catch (e){
+    const mentionResponseBlock = {
+      ...messageJsonBlock,
+      ...{ channel: event.channel },
+      text: 'Congrats!',
+    };
+    const res = await webClient.chat.postMessage(mentionResponseBlock);
+    console.log('Message sent: ', res.ts);
+  } catch (e) {
     console.error('caught an error!!');
     console.error(e);
   }
-})
+});
 /* =====================================
  * =====================================
  * =====================================
@@ -98,9 +92,9 @@ slackEvents.on('app_mention', async (event) => {
  */
 
 // Starts server
-app.listen(port, function() {
-  console.log('Bot is listening on port ' + port)
-})
+app.listen(port, () => {
+  console.log(`Bot is listening on port ${port}`);
+});
 
 /* =====================================
  * =====================================
@@ -111,32 +105,40 @@ app.listen(port, function() {
  * =====================================
  * =====================================
  */
+const requestAllUsers = async (userIds) => {
+  const users = [];
 
-const createJsonBlock = (allUsers) => {
-  const users = allUsers.filter( user => user.name != 'ra_cert_bot' );
-  const blocks = users.map(createBlock);
-  return {blocks};
-};
-
-const createBlock = (user) => {
-  return {
-    "type": "section",
-    "text": {
-      "type": "mrkdwn",
-      "text": createMessage(user.real_name)
-    }
+  for (const userId of userIds) {
+    const response = webClient.users.info({ user: userId });
+    users.push(response.user);
   }
-};
 
-const createMessage = (name) => {
-  return `<${createUrl(name)}|certificates.rocketacademy.co | ${name} | Congrats!!>`;
+  return await Promise.all(users);
 };
 
 const createUrl = (name) => {
   // re-encode: console.log(Buffer.from(b64Encoded, 'base64').toString());
-  let b64 = Buffer.from(name).toString('base64');
-  let date = moment().format("Do MMMM YYYY"); // https://momentjs.com/docs/#/displaying/
+  const b64 = Buffer.from(name).toString('base64');
+  const date = moment().format('Do MMMM YYYY'); // https://momentjs.com/docs/#/displaying/
   return `${CERT_URL}?name=${name}&date=${date}&hash=${b64}`;
+};
+
+const createMessage = (name) => `<${createUrl(
+  name,
+)}|certificates.rocketacademy.co | ${name} | Congrats!!>`;
+
+const createBlock = (user) => ({
+  type: 'section',
+  text: {
+    type: 'mrkdwn',
+    text: createMessage(user.real_name),
+  },
+});
+
+const createJsonBlock = (allUsers) => {
+  const users = allUsers.filter((user) => user.name !== 'ra_cert_bot');
+  const blocks = users.map(createBlock);
+  return { blocks };
 };
 
 /* =====================================
