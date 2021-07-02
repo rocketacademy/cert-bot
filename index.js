@@ -41,17 +41,6 @@ const webClient = new WebClient(token)
  * =====================================
  * =====================================
  * =====================================
- *   configure express app
- * =====================================
- * =====================================
- * =====================================
- */
-
-
-/* =====================================
- * =====================================
- * =====================================
- * =====================================
  *   slack events
  * =====================================
  * =====================================
@@ -65,6 +54,7 @@ app.use('/slack/events', slackEvents.expressMiddleware())
 
 slackEvents.on('app_mention', async (event) => {
   try {
+    console.log('app mention', event);
 
     // TODO: condition to restrict users based on user ID array
     // event.user
@@ -83,11 +73,14 @@ slackEvents.on('app_mention', async (event) => {
       let userId = userIds[i];
       const response = await webClient.users.info({ user: userId });
       users.push( response.user );
+
+      console.log('got one user', response);
     }
 
     const messageJsonBlock = createJsonBlock(users);
     const mentionResponseBlock = { ...messageJsonBlock, ...{channel: event.channel}, text: 'Congrats!'}
     const res = await webClient.chat.postMessage(mentionResponseBlock)
+    console.log('Message sent: ', res.ts)
 
   } catch (e){
     console.error('caught an error!!');
