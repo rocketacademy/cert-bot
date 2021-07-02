@@ -66,7 +66,7 @@ slackEvents.on('app_mention', async (event) => {
     const userIdStrs = event.text.match(/\<(.+?)\>/g);
     const userIds = userIdStrs.map((userIdStr) => userIdStr.substr(2, userIdStr.length - 3));
 
-    const users = await requestAllUsers(userIds);
+    const users = await (await requestAllUsers(userIds)).map((response) => response.user);
 
     const messageJsonBlock = createJsonBlock(users);
     const mentionResponseBlock = {
@@ -106,14 +106,14 @@ app.listen(port, () => {
  * =====================================
  */
 const requestAllUsers = async (userIds) => {
-  const users = [];
+  const responses = [];
 
   for (const userId of userIds) {
     const response = webClient.users.info({ user: userId });
-    users.push(response.user);
+    responses.push(response);
   }
 
-  return await Promise.all(users);
+  return await Promise.all(responses);
 };
 
 const createUrl = (name) => {
